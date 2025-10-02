@@ -4225,6 +4225,7 @@ public class TelephonyProvider extends ContentProvider
                         Telephony.SimInfo.COLUMN_EXT_SIM_STATE,
                         backedUpSimInfoEntry.getString(Telephony.SimInfo.COLUMN_EXT_SIM_STATE,
                                 DEFAULT_STRING_COLUMN_VALUE));
+
             }
             if (backupDataFormatVersion >= 73 << 16) {
                 contentValues.put(
