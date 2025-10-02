@@ -437,6 +437,9 @@ public class TelephonyProvider extends ContentProvider
         // SIM_INFO_COLUMNS_TO_BACKUP. For both cases, add appropriate versioning logic in
         // convertBackedUpDataToContentValues(ContentValues contenValues)
         SIM_INFO_COLUMNS_TO_BACKUP.put(
+                Telephony.SimInfo.COLUMN_EXT_SIM_STATE,
+                Cursor.FIELD_TYPE_STRING);
+        SIM_INFO_COLUMNS_TO_BACKUP.put(
                 Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID, Cursor.FIELD_TYPE_INTEGER);
         SIM_INFO_COLUMNS_TO_BACKUP.put(
                 Telephony.SimInfo.COLUMN_ICC_ID, Cursor.FIELD_TYPE_STRING);
@@ -4217,6 +4220,10 @@ public class TelephonyProvider extends ContentProvider
                         Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY,
                         backedUpSimInfoEntry.getString(
                                 Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY,
+                                DEFAULT_STRING_COLUMN_VALUE));
+                contentValues.put(
+                        Telephony.SimInfo.COLUMN_EXT_SIM_STATE,
+                        backedUpSimInfoEntry.getString(Telephony.SimInfo.COLUMN_EXT_SIM_STATE,
                                 DEFAULT_STRING_COLUMN_VALUE));
             }
             if (backupDataFormatVersion >= 73 << 16) {

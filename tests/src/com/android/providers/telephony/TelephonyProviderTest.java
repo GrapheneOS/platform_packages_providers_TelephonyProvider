@@ -999,6 +999,9 @@ public class TelephonyProviderTest {
         assertEquals(ARBITRARY_SIMINFO_DB_TEST_STRING_VALUE_1,
                 getStringValueFromCursor(cursor,
                         SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY));
+        assertEquals(ARBITRARY_SIMINFO_DB_TEST_STRING_VALUE_1,
+                getStringValueFromCursor(cursor,
+                        SimInfo.COLUMN_EXT_SIM_STATE));
 
         assertRestoredSubIdIsRemembered();
     }
