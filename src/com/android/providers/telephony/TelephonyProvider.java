@@ -568,6 +568,7 @@ public class TelephonyProvider extends ContentProvider
     @VisibleForTesting
     public static String getStringForSimInfoTableCreation(String tableName) {
         return "CREATE TABLE " + tableName + "("
+                + Telephony.SimInfo.COLUMN_EXT_SIM_STATE + " TEXT,"
                 + Telephony.SimInfo.COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID
                 + " INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + Telephony.SimInfo.COLUMN_ICC_ID + " TEXT NOT NULL,"
@@ -764,6 +765,32 @@ public class TelephonyProvider extends ContentProvider
             XmlUtils.beginDocument(parser, "apns");
             int publicversion = Integer.parseInt(parser.getAttributeValue(null, "version"));
             int version = DATABASE_VERSION | publicversion;
+
+            if (DATABASE_VERSION == 74 << 16) {
+                // All of this is not needed when DATABASE_VERSION gets incremented to 75 << 16 
+                // in AOSP.
+
+                final int extDatabaseVersion = 1;
+                // We want a database version that won't conflict with AOSP versions. Insert our
+                // extDatabaseVersion between the bits of the major database version and the
+                // public version. That way, if AOSP increments DATABASE_VERSION or AOSP / vendor 
+                // increments publicversion, it would still be recognized as a new upgrade.
+
+                // DATABASE version is shifted 16 bits
+                // We can just use around 8 bits for extDatabaseVersion, and then put publicVersion
+                // in the remaining bits. publicVersion is originally in the least significant bits
+                version = DATABASE_VERSION | (extDatabaseVersion << 8) | publicversion;
+
+                if (version <= (74 << 16 | 6)) {
+                    throw new AssertionError(
+                        "ext version should be an increment over the latest upstream migration");
+                }
+                if (version >= 75 << 16) {
+                    throw new AssertionError("ext version too large and would conflict with" +
+                            "future AOSP's DATABASE_VERSION");
+                }
+            }
+
             if (VDBG) log("getVersion:- version=0x" + Integer.toHexString(version));
             return version;
         } catch (Exception e) {
@@ -2227,6 +2254,23 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 74 << 16 | 6;
             }
+            // GrapheneOS: DATABASE_VERSION is 74, EXT version is 1, apn publicversion is >= 6
+            if (oldVersion < ((74 << 16) | (1 << 8) | 6)) {
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + Telephony.SimInfo.COLUMN_EXT_SIM_STATE
+                            + " TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade failed to update " + SIMINFO_TABLE
+                                + " to add extened SIM state");
+                    }
+                }
+                oldVersion = (74 << 16) | (1 << 8) | 6;
+            }
+            // Add new AOSP upstream migrations below
+
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
             }
@@ -4174,7 +4218,6 @@ public class TelephonyProvider extends ContentProvider
                         backedUpSimInfoEntry.getString(
                                 Telephony.SimInfo.COLUMN_SATELLITE_ENTITLEMENT_VOICE_SERVICE_POLICY,
                                 DEFAULT_STRING_COLUMN_VALUE));
-
             }
             if (backupDataFormatVersion >= 73 << 16) {
                 contentValues.put(
