@@ -824,7 +824,6 @@ public class TelephonyProviderTest {
         // get values in table
         final String[] testProjection =
         {
-            SubscriptionManager.EXT_SIM_STATE,
             SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID,
             SubscriptionManager.CARRIER_NAME,
             SubscriptionManager.CARD_ID,
@@ -850,6 +849,14 @@ public class TelephonyProviderTest {
         String[] selectionArgs = { insertDisplayName };
         Log.d(TAG,"\ntestSimTable selection: " + selection
                 + "\ntestSimTable selectionArgs: " + Arrays.toString(selectionArgs));
+        {
+            Cursor cursor = mContentResolver.query(SimInfo.CONTENT_URI,
+                new String[] { SubscriptionManager.EXT_SIM_STATE }, selection, selectionArgs, null);
+                    assertNotNull(cursor);
+            assertEquals(1, cursor.getCount());
+            cursor.moveToFirst();
+            assertEquals(insertExtSimState, cursor.getString(0));
+        }
         Cursor cursor = mContentResolver.query(SimInfo.CONTENT_URI,
                 testProjection, selection, selectionArgs, null);
 
@@ -857,7 +864,6 @@ public class TelephonyProviderTest {
         assertNotNull(cursor);
         assertEquals(1, cursor.getCount());
         cursor.moveToFirst();
-        assertEquals(insertExtSimState, cursor.getString(20));
         final int resultSubId = cursor.getInt(0);
         final String resultCarrierName = cursor.getString(1);
         final String resultCardId = cursor.getString(2);
