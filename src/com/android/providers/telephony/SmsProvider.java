@@ -462,9 +462,17 @@ public class SmsProvider extends ContentProvider {
                         Sms.CONTAINS_OTP, Sms.OTP_TYPE_PENDING, Sms.DATE, pendingOtpCutoff));
                 final String hash = PackageBasedTokenUtil.generatePackageBasedToken(
                         getContext().getPackageManager(), callingPackage);
+                var packageHashes = new ArrayList<String>();
                 if (hash != null) {
+                    packageHashes.add(hash);
+                }
+
+                SmsProviderExt.maybeGetGmsCoreDependantPackageHashes(requireContext(),
+                        callingPackage, callerUserHandle, packageHashes);
+
+                for (String packageHash : packageHashes) {
                     where.append(String.format(" OR (%s LIKE '%%%s%%')",
-                            Sms.BODY, hash));
+                            Sms.BODY, packageHash));
                 }
                 qb.appendWhereStandalone(where.toString());
             }
