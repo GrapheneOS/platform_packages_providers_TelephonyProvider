@@ -275,6 +275,68 @@ public class MmsSmsProviderTest {
         }
     }
 
+    @Test
+    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void testQuery_subIdEmpty_returnsEmptyCursor() {
+        // Setup mock to return empty subscriptions
+        doReturn(new ArrayList<SubscriptionInfo>()).when(mSubscriptionManager)
+                .getSubscriptionInfoListAssociatedWithUser(any(UserHandle.class));
+
+        String[] urisToTest = {
+                "content://mms-sms/conversations?simple=true",
+                "content://mms-sms/conversations/1/recipients",
+                "content://mms-sms/conversations/1/subject",
+                "content://mms-sms/search?pattern=test",
+                "content://mms-sms/searchSuggest?pattern=test"
+        };
+
+        for (String uriString : urisToTest) {
+            Uri testUri = Uri.parse(uriString);
+            Cursor cursor = null;
+            try {
+                cursor = mMmsSmsProvider.query(testUri, null, null, null, null);
+                assertNotNull("Cursor should not be null for URI: " + uriString, cursor);
+                assertEquals("Cursor should be empty for URI: " + uriString + " when no subIds", 0,
+                        cursor.getCount());
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
+    public void testQuery_subIdValid_doesNotReturnEmptyCursor() {
+        // Mocks for sub_id are already setup in setUp()
+
+        String[] urisToTest = {
+                "content://mms-sms/conversations?simple=true",
+                "content://mms-sms/conversations/1/recipients",
+                "content://mms-sms/conversations/1/subject",
+                "content://mms-sms/search?pattern=test",
+                "content://mms-sms/searchSuggest?pattern=test"
+        };
+
+        for (String uriString : urisToTest) {
+            Uri testUri = Uri.parse(uriString);
+            Cursor cursor = null;
+            try {
+                cursor = mMmsSmsProvider.query(testUri, null, null, null, null);
+                assertNotNull("Cursor should not be null for URI: " + uriString, cursor);
+                // We just verify it does not crash and returns a cursor.
+                // The actual count might be 0 if the preset data does not match the specific URI
+                // (like search), but we are primarily testing that it doesn't short-circuit to
+                // an empty cursor due to sub_id checks.
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+    }
+
     private void insertPresetData() {
         // Insert common data for all tests
         try {

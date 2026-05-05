@@ -198,7 +198,7 @@ public class MmsSmsProvider extends ContentProvider {
 
     private static final String[] SEARCH_STRING = new String[1];
     private static final String SEARCH_QUERY = "SELECT snippet(words, '', ' ', '', 1, 1) as " +
-            "snippet FROM words WHERE index_text MATCH ? ORDER BY snippet LIMIT 50;";
+            "snippet FROM words WHERE index_text MATCH ?";
 
     private static final String SMS_CONVERSATION_CONSTRAINT = "(" +
             Sms.TYPE + " != " + Sms.MESSAGE_TYPE_DRAFT + ")";
@@ -210,7 +210,7 @@ public class MmsSmsProvider extends ContentProvider {
             Mms.MESSAGE_TYPE + " = " + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + "))";
 
     private static String getTextSearchQuery(String smsTable, String pduTable,
-            boolean canReadRestrictedMessages, String otpFilter) {
+            boolean canReadRestrictedMessages, String otpFilter, String selectionBySubIds) {
 
         // Append read restriction clause to the query if the caller can't read restricted messages.
         String smsQueryReadRestrictionClause =
@@ -218,6 +218,8 @@ public class MmsSmsProvider extends ContentProvider {
                         ? (" AND " + getRestrictedTextSearchQueryWhereClause(smsTable)) : "";
 
         String smsOtpClause = !TextUtils.isEmpty(otpFilter) ? " AND " + otpFilter + " " : "";
+        String smsSubIdClause = !TextUtils.isEmpty(selectionBySubIds)
+                ? " AND " + smsTable + "." + selectionBySubIds.replace("'", "") + " " : "";
 
         // Search on the words table but return the rows from the corresponding sms table
         final String smsQuery = "SELECT "
@@ -234,12 +236,15 @@ public class MmsSmsProvider extends ContentProvider {
                 + "AND " + smsTable + "._id=words.source_id "
                 + smsQueryReadRestrictionClause
                 + smsOtpClause
+                + smsSubIdClause
                 + "AND words.table_to_use=1)";
 
         // Append read restriction clause to the query if the caller can't read restricted messages.
         String mmsQueryReadRestrictionClause =
                 Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages
                         ? (" AND " + getRestrictedTextSearchQueryWhereClause(pduTable)) : "";
+        String mmsSubIdClause = !TextUtils.isEmpty(selectionBySubIds)
+                ? " AND " + pduTable + "." + selectionBySubIds.replace("'", "") + " " : "";
         // Search on the words table but return the rows from the corresponding parts table
         final String mmsQuery = "SELECT "
                 + pduTable + "._id,"
@@ -258,6 +263,7 @@ public class MmsSmsProvider extends ContentProvider {
                 + "AND (index_text MATCH ?) "
                 + "AND (part._id = words.source_id) "
                 + mmsQueryReadRestrictionClause
+                + mmsSubIdClause
                 + "AND (words.table_to_use=2))";
 
         // This code queries the sms and mms tables and returns a unified result set
@@ -517,6 +523,13 @@ public class MmsSmsProvider extends ContentProvider {
                             break;
                         }
                     }
+                    if (selectionBySubIds == null) {
+                        // No subscriptions associated with user, return empty cursor.
+                        Log.d(LOG_TAG, "URI_CONVERSATIONS - subId not associated with user.");
+                        return emptyCursor;
+                    }
+                    selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                     cursor = getSimpleConversations(
                             projection, selection, selectionArgs,
                             canReadRestrictedMessages, otpFilter);
@@ -544,11 +557,24 @@ public class MmsSmsProvider extends ContentProvider {
                         otpFilter);
                 break;
             case URI_CONVERSATIONS_RECIPIENTS:
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG,
+                            "URI_CONVERSATIONS_RECIPIENTS - subId not associated with user.");
+                    return emptyCursor;
+                }
+                selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder, canReadRestrictedMessages, otpFilter);
                 break;
             case URI_CONVERSATIONS_SUBJECT:
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_CONVERSATIONS_SUBJECT - subId not associated with user.");
+                    return emptyCursor;
+                }
+                selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder, canReadRestrictedMessages, otpFilter);
@@ -625,6 +651,11 @@ public class MmsSmsProvider extends ContentProvider {
                 if (!TextUtils.isEmpty(otpFilter)) {
                     return emptyCursor;
                 }
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_CONVERSATIONS_SUGGEST - subId not associated with user.");
+                    return emptyCursor;
+                }
+
                 SEARCH_STRING[0] = uri.getQueryParameter("pattern") + '*' ;
 
                 // find the words which match the pattern using the snippet function.  The
@@ -639,7 +670,9 @@ public class MmsSmsProvider extends ContentProvider {
                             "with this query");
                 }
 
-                cursor = db.rawQuery(SEARCH_QUERY, SEARCH_STRING);
+                String searchQuery = SEARCH_QUERY + " AND " + selectionBySubIds.replace("'", "")
+                        + " ORDER BY snippet LIMIT 50;";
+                cursor = db.rawQuery(searchQuery, SEARCH_STRING);
                 break;
             }
             case URI_MESSAGE_ID_TO_THREAD: {
@@ -681,11 +714,16 @@ public class MmsSmsProvider extends ContentProvider {
                             "with this query");
                 }
 
+                if (selectionBySubIds == null) {
+                    Log.d(LOG_TAG, "URI_SEARCH - subId not associated with user.");
+                    return emptyCursor;
+                }
+
                 String searchString = uri.getQueryParameter("pattern") + "*";
 
                 try {
                     cursor = db.rawQuery(getTextSearchQuery(smsTable, pduTable,
-                        canReadRestrictedMessages, otpFilter),
+                        canReadRestrictedMessages, otpFilter, selectionBySubIds),
                             new String[] { searchString, searchString });
                 } catch (Exception ex) {
                     Log.e(LOG_TAG, "got exception: " + ex.toString());
