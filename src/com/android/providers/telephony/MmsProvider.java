@@ -271,6 +271,14 @@ public class MmsProvider extends ContentProvider {
 
         final String pduTable = getPduTable(accessRestricted);
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
+        if (accessRestricted) {
+            // Enable strict mode to validate columns against projection map and prevent SQL
+            // injection in WHERE clauses.
+            qb.setStrict(true);
+            // Enable strict grammar check to validate SQL syntax and prevent syntax-based
+            // injections (e.g. mismatched parentheses).
+            qb.setStrictGrammar(true);
+        }
 
         // Generate the body of the query.
         int match = sURLMatcher.match(uri);
@@ -372,7 +380,12 @@ public class MmsProvider extends ContentProvider {
             // No subscriptions associated with user, return empty cursor.
             return new MatrixCursor((projection == null) ? (new String[] {}) : projection);
         }
-        selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
+        if (!TextUtils.isEmpty(selectionBySubIds)) {
+            // Use appendWhereStandalone to safely append the subId filter.
+            // This automatically wraps the filter in parentheses, preventing the caller's
+            // selection from escaping its scope and bypassing the filter.
+            qb.appendWhereStandalone(selectionBySubIds);
+        }
 
         String finalSortOrder = null;
         if (TextUtils.isEmpty(sortOrder)) {

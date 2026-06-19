@@ -355,6 +355,16 @@ public class MmsSmsProviderTest {
         }
     }
 
+    @Test
+    public void testQuery_withSubquery_returnsNull() {
+        Uri testUri = Uri.parse("content://mms-sms/conversations");
+        String[] projection = new String[]{"(SELECT _id FROM sms) AS id"};
+
+        Cursor cursor = mMmsSmsProvider.query(testUri, projection, null, null, null);
+        assertNull("Cursor should be null due to caught exception for subquery in projection",
+                cursor);
+    }
+
     static void logd(String msg) {
         Log.d(TAG, msg);
     }

@@ -446,6 +446,41 @@ public class SmsProviderTest extends TestCase {
 
     @Test
     @SmallTest
+    public void testQuery_withMaliciousProjection_rejected() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        // Malicious projection attempting to execute a subquery or inject SQL
+        String[] maliciousProjection = new String[]{"_id", "(SELECT * FROM sms)"};
+
+        try {
+            Cursor cursor = mSmsProviderTestable.query(testUri, maliciousProjection, null, null,
+                    null);
+            assertNull("Cursor should be null due to caught exception for malicious projection",
+                    cursor);
+        } catch (IllegalArgumentException e) {
+            // Expected behavior if strict query validation throws
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testQuery_withMaliciousSortOrder_rejected() {
+        Uri testUri = Telephony.Sms.CONTENT_URI;
+        String[] projection = new String[]{Telephony.Sms._ID};
+        // Malicious sortOrder attempting to inject SQL
+        String maliciousSortOrder = "date DESC; DROP TABLE sms;";
+
+        try {
+            Cursor cursor = mSmsProviderTestable.query(testUri, projection, null, null,
+                    maliciousSortOrder);
+            assertNull("Cursor should be null due to caught exception for malicious sortOrder",
+                    cursor);
+        } catch (IllegalArgumentException e) {
+            // Expected behavior if strict query validation throws
+        }
+    }
+
+    @Test
+    @SmallTest
     public void testOtpUpdate_whenDbLocked_retries() {
         try {
             mSmsProviderTestable.mLockedExceptionCountToSimulate = 1;

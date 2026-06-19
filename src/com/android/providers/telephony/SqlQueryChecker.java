@@ -18,17 +18,39 @@ package com.android.providers.telephony;
 
 import android.util.Log;
 import android.provider.Telephony.ReadRestriction;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
 
 public class SqlQueryChecker {
-    private static final String SELECT_TOKEN = "select";
+    private static final Set<String> DISALLOWED_TOKENS = Set.of(
+            "SELECT",
+            "UNION",
+            "EXCEPT",
+            "INTERSECT",
+            "JOIN",
+            "FROM",
+            "GROUP",
+            "HAVING",
+            "WINDOW",
+            "VALUES"
+    );
+
+    private static final Set<String> DISALLOWED_FUNCTIONS = Set.of(
+            "HEX", "SUBSTR", "SQLITE_VERSION", "UNICODE", "PRINTF", "INSTR",
+            "RANDOM", "RANDOMBLOB", "ZEROBLOB", "TYPEOF"
+    );
+
     private static final Set<String> FORBIDDEN_TOKENS =
         Set.of(ReadRestriction.READ_RESTRICTION_COLUMN_NAME);
 
-    static void checkTokenForSelect(String token) {
-        if (SELECT_TOKEN.equalsIgnoreCase(token)) {
-            throw new IllegalArgumentException("SELECT token not allowed in query");
+    static void checkTokenForDisallowed(String token) {
+        String tokenUpper = token.toUpperCase(Locale.US);
+        if (DISALLOWED_TOKENS.contains(tokenUpper)) {
+            throw new IllegalArgumentException(tokenUpper + " token not allowed in query");
+        }
+        if (DISALLOWED_FUNCTIONS.contains(tokenUpper)) {
+            throw new IllegalArgumentException("Function " + tokenUpper + " not allowed in query");
         }
     }
 
@@ -40,14 +62,14 @@ public class SqlQueryChecker {
     }
 
     /**
-     * Check the query parameters to see if they contain subqueries. Throws an
+     * Check the query parameters to see if they contain disallowed tokens. Throws an
      * {@link IllegalArgumentException} if they do. See
      * {@link android.content.ContentProvider#query} for the definitions of the arguments.
      */
     static void checkQueryParametersForSubqueries(String[] projection,
             String selection, String sortOrder) {
         checkQueryForToken(projection, selection, sortOrder, "MmsProvider",
-                "checkQueryParametersForSubqueries", SqlQueryChecker::checkTokenForSelect);
+                "checkQueryParametersForSubqueries", SqlQueryChecker::checkTokenForDisallowed);
     }
 
     /**

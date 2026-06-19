@@ -273,4 +273,90 @@ public class MmsProviderTest extends TestCase {
             }
         }
     }
+
+    @Test
+    public void testDelete_withSelectionArgs_doesNotCheckSelectionArgsForForbiddenColumns() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String selection = "thread_id=?";
+        // "restricted" is a forbidden column.
+        // If selectionArgs is checked, it would throw an exception.
+        String[] selectionArgs = new String[]{"restricted"};
+
+        try {
+            mMmsProviderTestable.delete(testUri, selection, selectionArgs);
+        } catch (IllegalArgumentException e) {
+            fail("delete should not throw IllegalArgumentException for selectionArgs: "
+                    + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testUpdate_withSelectionArgs_doesNotCheckSelectionArgsForForbiddenColumns() {
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        ContentValues values = new ContentValues();
+        values.put(Telephony.Mms.READ, 1);
+        String selection = "thread_id=?";
+        // "restricted" is a forbidden column.
+        // If selectionArgs is checked, it would throw an exception.
+        String[] selectionArgs = new String[]{"restricted"};
+
+        try {
+            mMmsProviderTestable.update(testUri, values, selection, selectionArgs);
+        } catch (IllegalArgumentException e) {
+            fail("update should not throw IllegalArgumentException for selectionArgs: "
+                    + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testInsertMms_withAddressAndThreadId_removesAddressColumn() {
+        final ContentValues values = getTestContentValues();
+        values.put(Telephony.Mms.THREAD_ID, 1);
+        values.put(Telephony.CanonicalAddressesColumns.ADDRESS, "12345");
+
+        Uri expected = Uri.parse("content://mms/1");
+        Uri actual = mContentResolver.insert(Telephony.Mms.CONTENT_URI, values);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testUpdateMms_withAddress_removesAddressColumn() {
+        final ContentValues values = getTestContentValues();
+        Uri uri = mContentResolver.insert(Telephony.Mms.CONTENT_URI, values);
+        assertNotNull(uri);
+
+        final ContentValues updateValues = new ContentValues();
+        updateValues.put(Telephony.Mms.SUBJECT, "new subject");
+        updateValues.put(Telephony.CanonicalAddressesColumns.ADDRESS, "12345");
+
+        int count = mContentResolver.update(uri, updateValues, null, null);
+        assertEquals(1, count);
+    }
+
+    @Test
+    public void testInsertMms_withoutSubId_defaultsToInvalidSubIdWithoutCrash() {
+        final ContentValues values = getTestContentValues();
+        values.remove(Telephony.Mms.SUBSCRIPTION_ID);
+
+        Uri expected = Uri.parse("content://mms/1");
+        Uri actual = mContentResolver.insert(Telephony.Mms.CONTENT_URI, values);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testQuery_withSubquery_throwsIllegalArgumentException() {
+        MmsProvider.ProviderUtilWrapper providerUtilWrapper =
+                mock(MmsProvider.ProviderUtilWrapper.class);
+        when(providerUtilWrapper.isAccessRestricted(
+                any(Context.class), anyString(), anyInt())).thenReturn(true);
+        mMmsProviderTestable.setProviderUtilWrapper(providerUtilWrapper);
+
+        Uri testUri = Telephony.Mms.CONTENT_URI;
+        String[] projection = new String[]{"(SELECT _id FROM sms) AS id"};
+
+        org.junit.Assert.assertThrows(IllegalArgumentException.class, () ->
+                mMmsProviderTestable.query(testUri, projection, null, null, null));
+    }
 }

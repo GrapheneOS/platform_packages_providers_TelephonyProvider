@@ -284,6 +284,14 @@ public class SmsProvider extends ContentProvider {
                 getContext(), getCallingPackage(), callingUid);
         final String smsTable = getSmsTable(accessRestricted);
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
+        if (accessRestricted) {
+            // Enable strict mode to validate columns against projection map and prevent SQL
+            // injection in WHERE clauses.
+            qb.setStrict(true);
+            // Enable strict grammar check to validate SQL syntax and prevent syntax-based
+            // injections (e.g. mismatched parentheses).
+            qb.setStrictGrammar(true);
+        }
 
         // If access is restricted, we don't allow subqueries in the query.
         if (accessRestricted) {
@@ -551,7 +559,12 @@ public class SmsProvider extends ContentProvider {
             filter = selectionBySubIds == null ?
                     selectionByEmergencyNumbers : selectionBySubIds;
         }
-        selection = DatabaseUtils.concatenateWhere(selection, filter);
+        if (!TextUtils.isEmpty(filter)) {
+            // Use appendWhereStandalone to safely append the subId/emergency filter.
+            // This automatically wraps the filter in parentheses, preventing the caller's
+            // selection from escaping its scope and bypassing the filter.
+            qb.appendWhereStandalone(filter);
+        }
 
         String orderBy = null;
 
