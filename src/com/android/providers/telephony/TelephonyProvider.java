@@ -4699,6 +4699,10 @@ public class TelephonyProvider extends ContentProvider
         int match = s_urlMatcher.match(url);
         checkPermissionCompat(match, projectionIn);
 
+        if (!isCallingFromSystemOrPhoneUid()) {
+            SqlQueryChecker.checkQueryParametersForSubqueries(projectionIn, selection, sort);
+        }
+
         mDefaultSubId = SubscriptionManager.getDefaultSubscriptionId();
         return queryInternal(url, projectionIn, selection, selectionArgs, sort);
     }
